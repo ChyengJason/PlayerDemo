@@ -6,6 +6,7 @@ extern "C" {
 #include "libavcodec/avcodec.h" // 编码
 #include "libavformat/avformat.h" // 封装格式
 #include "libswscale/swscale.h" // 变换信息
+#include "libswresample/swresample.h" //音频采样
 #include <unistd.h>
 #include <android/native_window_jni.h>
 }
@@ -126,5 +127,90 @@ Java_com_jscheng_playerdemo_FFmpeg_renderVideo(JNIEnv *env, jobject instance, js
     avcodec_close(avCodecContext);
     avformat_free_context(avFormatContext);
 
+    env->ReleaseStringUTFChars(path_, path);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_jscheng_playerdemo_FFmpeg_renderAudio(JNIEnv *env, jobject instance, jstring path_) {
+    const char *path = env->GetStringUTFChars(path_, 0);
+
+    av_register_all();
+    AVFormatContext *avFormatContext = avformat_alloc_context();
+    int error;
+    char buf[] = "";
+    if ((error = avformat_open_input(&avFormatContext, path, NULL, NULL)) < 0) {
+        av_strerror(error, buf, 1024);
+        LOGE("Couldn't open file %s: %d(%s)", path, error, buf);
+        LOGE("打开视频失败");
+        return;
+    }
+    if (avformat_find_stream_info(avFormatContext, NULL) < 0) {
+        LOGE(" 获取内容失败 ");
+        return;
+    }
+    int audio_index = -1;
+    for (int i = 0; i < avFormatContext->nb_streams; ++i) {
+        if (avFormatContext->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+            audio_index = i;
+        }
+    }
+    LOGE("音频流: %d", audio_index);
+    if (audio_index == -1) {
+        LOGE("音频流获取失败");
+        return;
+    }
+    AVCodecContext *avCodecContext = avFormatContext->streams[audio_index]->codec;
+    AVCodec *avCodec = avcodec_find_decoder(avCodecContext->codec_id);
+    if (avcodec_open2(avCodecContext, avCodec, NULL) < 0) {
+        LOGE("打开解码器失败");
+        return;
+    }
+
+    AVPacket *packet = (AVPacket *) av_malloc(sizeof(AVPacket));
+    av_init_packet(packet);
+    AVFrame *frame = av_frame_alloc();
+    // 重采样
+    SwrContext *swrContext = swr_alloc();
+    // 缓存区
+    uint8_t *out_buffer = (uint8_t *) av_malloc(44100 * 2);
+    // 输出声道
+    uint16_t  out_channel_layout = AV_CH_LAYOUT_STEREO;
+    // 采样位数
+    enum AVSampleFormat out_formart = AV_SAMPLE_FMT_S16;
+    // 输出的采样率必须与输入相同
+    int out_sample_rate = avCodecContext->sample_rate;
+    swr_alloc_set_opts(swrContext, out_channel_layout, out_formart, out_sample_rate,
+                       avCodecContext->channel_layout, avCodecContext->sample_fmt, avCodecContext->sample_rate, 0,
+                       NULL);
+    swr_init(swrContext);
+    // 获取通道数
+    int out_channel_count = av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
+
+    jclass ffmpeg = env->GetObjectClass(instance);
+    jmethodID  createTrack = env->GetMethodID(ffmpeg, "createTrack", "(II)V");
+    env->CallVoidMethod(instance, createTrack, 44100, out_channel_count);
+    jmethodID playTrack = env->GetMethodID(ffmpeg, "playTrack", "([BI)V");
+
+    int got_frame;
+    while (av_read_frame(avFormatContext, packet) >= 0) {
+        if (packet->stream_index == audio_index) {
+            // mp3解码为pcm
+            avcodec_decode_audio4(avCodecContext, frame, &got_frame, packet);
+            if (got_frame) {
+                swr_convert(swrContext, &out_buffer, 44100 * 2, (const uint8_t **) frame->data, frame->nb_samples);
+                int size = av_samples_get_buffer_size(NULL, out_channel_count, frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+                jbyteArray audio_sample_array = env->NewByteArray(size);
+                env->SetByteArrayRegion(audio_sample_array, 0, size, (const jbyte *) out_buffer);
+                env->CallVoidMethod(instance, playTrack, audio_sample_array, size);
+                env->DeleteLocalRef(audio_sample_array);
+            }
+        }
+    }
+
+    av_frame_free(&frame);
+    swr_free(&swrContext);
+    avcodec_close(avCodecContext);
+    avformat_close_input(&avFormatContext);
     env->ReleaseStringUTFChars(path_, path);
 }

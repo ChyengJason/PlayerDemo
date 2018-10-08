@@ -8,7 +8,6 @@ import android.view.SurfaceView;
 
 public class VideoSurfaceView extends SurfaceView implements Runnable {
     private final static String TAG = "CJS";
-    private FFmpeg mFFmpeg;
     private String mVideoPath;
 
     public VideoSurfaceView(Context context) {
@@ -28,7 +27,6 @@ public class VideoSurfaceView extends SurfaceView implements Runnable {
 
     private void init() {
         this.getHolder().setFormat(PixelFormat.RGBA_8888);
-        this.mFFmpeg = new FFmpeg();
         this.mVideoPath = null;
     }
 
@@ -41,7 +39,7 @@ public class VideoSurfaceView extends SurfaceView implements Runnable {
     public void run() {
         if (mVideoPath != null) {
             Log.e(TAG, "run: " + mVideoPath );
-            mFFmpeg.renderVideo(mVideoPath, this.getHolder().getSurface());
+            FFmpeg.getInstance().playVideo(mVideoPath, this.getHolder().getSurface());
         }
     }
 }

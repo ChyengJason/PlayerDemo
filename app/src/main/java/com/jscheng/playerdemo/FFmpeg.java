@@ -1,8 +1,23 @@
 package com.jscheng.playerdemo;
 
+import android.util.Log;
 import android.view.Surface;
 
 public class FFmpeg {
+    private static FFmpeg instance = null;
+
+    public static FFmpeg getInstance() {
+        if (instance == null) {
+            instance = new FFmpeg();
+        }
+        return instance;
+    }
+
+    private FFmpeg() {
+
+    }
+
+    private static final String TAG = "CJS";
     static {
         System.loadLibrary("avcodec-56");
         System.loadLibrary("avdevice-56");
@@ -15,7 +30,37 @@ public class FFmpeg {
         System.loadLibrary("native-lib");
     }
 
+    private IPlayAudio mPlayAudioListener;
+
+    public void playVideo(String mVideoPath, Surface surface) {
+        renderVideo(mVideoPath, surface);
+    }
+
+    public void playAudio(String path, IPlayAudio playInter) {
+        mPlayAudioListener = playInter;
+        renderAudio(path);
+    }
+
+    public void createTrack(int samplerate, int channelNum) {
+        if (mPlayAudioListener != null) {
+            mPlayAudioListener.createTrack(samplerate, channelNum);
+        }
+    }
+
+    public void playTrack(byte[] buffer, int length) {
+        if (mPlayAudioListener != null) {
+            mPlayAudioListener.playTrack(buffer, length);
+        }
+    }
+
     public native String stringFromJNI();
 
     public native void renderVideo(String path, Surface surface);
+
+    public native void renderAudio(String path);
+
+    public interface IPlayAudio {
+        void createTrack(int samplerate, int channelNum);
+        void playTrack(byte[] buffer, int length);
+    }
 }
