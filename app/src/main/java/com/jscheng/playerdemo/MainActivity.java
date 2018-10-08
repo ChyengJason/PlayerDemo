@@ -1,8 +1,6 @@
 package com.jscheng.playerdemo;
 
 import android.content.Intent;
-import android.os.Build;
-import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -11,7 +9,6 @@ import android.view.SurfaceHolder;
 
 import com.jscheng.playerdemo.utils.MediaUtil;
 import com.jscheng.playerdemo.utils.PermissionUtil;
-import com.jscheng.playerdemo.utils.PhoneUtil;
 import com.jscheng.playerdemo.utils.StorageUtil;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
@@ -53,7 +50,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_PICK && resultCode == RESULT_OK) {
             String videoPath = StorageUtil.getUrlAbsulotePath(this, data.getData());
-            //mVideoView.play(videoPath);
+            mVideoView.play(videoPath);
             mAudioPlayer.play(videoPath);
         }
     }
