@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include "android_log.h"
+#include "Opensles.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h" // 编码
@@ -92,7 +93,6 @@ Java_com_jscheng_playerdemo_FFmpeg_renderVideo(JNIEnv *env, jobject instance, js
     LOGE("开始解码");
     int frameCount = 0;
     while(av_read_frame(avFormatContext, packet) >= 0) {
-        LOGE("解码: %d ", packet->stream_index);
         if (packet->stream_index == video_index) {
             // 解码
             avcodec_decode_video2(avCodecContext, frame, &frameCount, packet);
@@ -213,4 +213,106 @@ Java_com_jscheng_playerdemo_FFmpeg_renderAudio(JNIEnv *env, jobject instance, js
     avcodec_close(avCodecContext);
     avformat_close_input(&avFormatContext);
     env->ReleaseStringUTFChars(path_, path);
+}
+
+AVFormatContext *avFormatContext;
+AVCodecContext *avCodecContext;
+AVCodec *avCodec;
+AVPacket *packet;
+AVFrame *frame;
+SwrContext *swrContext;
+uint8_t *out_buffer;
+int out_channel_count;
+int audio_index;
+Opensles mOpensles;
+
+void getPcmData(void **pcm, size_t *pcm_size) {
+    int got_frame;
+    while (av_read_frame(avFormatContext, packet) >= 0) {
+        if (packet->stream_index == audio_index) {
+            avcodec_decode_audio4(avCodecContext, frame, &got_frame, packet);
+            if (got_frame) {
+                swr_convert(swrContext, &out_buffer, 44100 * 2, (const uint8_t **) frame->data, frame->nb_samples);
+                int size = av_samples_get_buffer_size(NULL, out_channel_count, frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+                *pcm = out_buffer;
+                *pcm_size = size;
+                break;
+            }
+        }
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_jscheng_playerdemo_FFmpeg_renderSlesAudio(JNIEnv *env, jobject instance, jstring path_) {
+    const char *path = env->GetStringUTFChars(path_, 0);
+
+    av_register_all();
+    avFormatContext = avformat_alloc_context();
+    int error;
+    char buf[] = "";
+    if ((error = avformat_open_input(&avFormatContext, path, NULL, NULL)) < 0) {
+        av_strerror(error, buf, 1024);
+        LOGE("Couldn't open file %s: %d(%s)", path, error, buf);
+        LOGE("打开视频失败");
+        return;
+    }
+    if (avformat_find_stream_info(avFormatContext, NULL) < 0) {
+        LOGE(" 获取内容失败 ");
+        return;
+    }
+    audio_index = -1;
+    for (int i = 0; i < avFormatContext->nb_streams; ++i) {
+        if (avFormatContext->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+            audio_index = i;
+        }
+    }
+    LOGE("音频流: %d", audio_index);
+    if (audio_index == -1) {
+        LOGE("音频流获取失败");
+        return;
+    }
+    avCodecContext = avFormatContext->streams[audio_index]->codec;
+    avCodec = avcodec_find_decoder(avCodecContext->codec_id);
+    if (avcodec_open2(avCodecContext, avCodec, NULL) < 0) {
+        LOGE("打开解码器失败");
+        return;
+    }
+
+    packet = (AVPacket *) av_malloc(sizeof(AVPacket));
+    av_init_packet(packet);
+    frame = av_frame_alloc();
+    // 重采样
+    swrContext = swr_alloc();
+    // 缓存区
+    out_buffer = (uint8_t *) av_malloc(44100 * 2);
+    // 输出声道
+    uint16_t  out_channel_layout = AV_CH_LAYOUT_STEREO;
+    // 采样位数
+    enum AVSampleFormat out_formart = AV_SAMPLE_FMT_S16;
+    // 输出的采样率必须与输入相同
+    int out_sample_rate = avCodecContext->sample_rate;
+    swr_alloc_set_opts(swrContext, out_channel_layout, out_formart, out_sample_rate,
+                       avCodecContext->channel_layout, avCodecContext->sample_fmt, avCodecContext->sample_rate, 0,
+                       NULL);
+    swr_init(swrContext);
+    // 获取通道数
+    out_channel_count = av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
+
+    error = mOpensles.createEngine();
+    LOGE("opensles createEngine: %d", error);
+    error = mOpensles.createMixVolume();
+    LOGE("opensles createMixVolume: %d", error);
+    mOpensles.setPcmDataInterface(getPcmData);
+    mOpensles.createPlayer(avCodecContext->sample_rate, avCodecContext->channels);
+    env->ReleaseStringUTFChars(path_, path);
+}
+
+void release(){
+    av_free_packet(packet);
+    av_free(out_buffer);
+    av_frame_free(&frame);
+    swr_free(&swrContext);
+    avcodec_close(avCodecContext);
+    avformat_close_input(&avFormatContext);
 }

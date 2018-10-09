@@ -68,7 +68,8 @@ set_target_properties(swscale-3
 
 add_library(native-lib
             SHARED
-            src/main/cpp/native-lib.cpp )
+            src/main/cpp/native-lib.cpp
+            src/main/cpp/Opensles.cpp)
 
 find_library(log-lib
              log )
@@ -83,4 +84,5 @@ target_link_libraries( native-lib
                        swresample-1
                        swscale-3
                        ${log-lib}
-                       android)
+                       android
+                       OpenSLES)

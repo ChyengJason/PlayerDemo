@@ -15,14 +15,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final int REQUEST_CODE = 1;
     private static final int REQUEST_PICK = 2;
     private VideoSurfaceView mVideoView;
-    private AudioPlayer mAudioPlayer;
+    //private AudioPlayer mAudioPlayer;
+    private OpenSlesPlayer mSlesPlayer;
     private boolean isPlaying = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mAudioPlayer = new AudioPlayer();
+        //mAudioPlayer = new AudioPlayer();
+        mSlesPlayer = new OpenSlesPlayer();
         mVideoView = findViewById(R.id.videoView);
         mVideoView.getHolder().addCallback(this);
     }
@@ -51,7 +53,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (requestCode == REQUEST_PICK && resultCode == RESULT_OK) {
             String videoPath = StorageUtil.getUrlAbsulotePath(this, data.getData());
             mVideoView.play(videoPath);
-            mAudioPlayer.play(videoPath);
+            mSlesPlayer.play(videoPath);
+            //mAudioPlayer.play(videoPath);
         }
     }
 

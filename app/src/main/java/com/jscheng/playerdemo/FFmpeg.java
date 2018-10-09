@@ -41,6 +41,10 @@ public class FFmpeg {
         renderAudio(path);
     }
 
+    public void playSlesAudio(String path) {
+        renderSlesAudio(path);
+    }
+
     public void createTrack(int samplerate, int channelNum) {
         if (mPlayAudioListener != null) {
             mPlayAudioListener.createTrack(samplerate, channelNum);
@@ -58,6 +62,8 @@ public class FFmpeg {
     public native void renderVideo(String path, Surface surface);
 
     public native void renderAudio(String path);
+
+    public native void renderSlesAudio(String path);
 
     public interface IPlayAudio {
         void createTrack(int samplerate, int channelNum);
