@@ -22,9 +22,9 @@ public:
     void createPlayer(size_t samplerate, size_t channelCount); // 创建播放器
     void release(); // 释放
     void setPcmDataInterface(PcmDataFunc func);
-
 private:
-    //void getDataQueueCallBack(SLAndroidSimpleBufferQueueItf bufferQueueInterface, void* context);
+    static void getDataQueueCallBack(SLAndroidSimpleBufferQueueItf bufferQueueInterface, void* context);
+    static PcmDataFunc *getPcmDataInterface; // 获取pcm数据的接口
 
     SLObjectItf mEngineObject; // 引擎接口对象
     SLEngineItf mEngineEngine; // 具体引擎对象实例

@@ -3,8 +3,9 @@
 //
 #include "Opensles.h"
 #include "android_log.h"
-void getDataQueueCallBack(SLAndroidSimpleBufferQueueItf bufferQueueInterface, void* context);
-PcmDataFunc *getPcmDataInterface = NULL;
+
+// static 类对象必须要在类外进行初始化
+PcmDataFunc* Opensles::getPcmDataInterface = NULL;
 
 Opensles::Opensles() {
 
@@ -25,11 +26,8 @@ bool Opensles::createEngine() {
 bool Opensles::createMixVolume() {
     SLresult result;
     result = (*mEngineEngine)->CreateOutputMix(mEngineEngine, &mOutputMixObject, 0, 0, 0); // 用引擎对象创建混音器对象
-    LOGE("CreateOutputMix %d", result);
     result = (*mOutputMixObject)->Realize(mOutputMixObject, SL_BOOLEAN_FALSE); // 实现混音器接口对象
-    LOGE("CreateOutputMix Realize %d", result);
     result = (*mOutputMixObject)->GetInterface(mOutputMixObject, SL_IID_ENVIRONMENTALREVERB, &mOutputMixEnvirRevarb); // 初始化 mOutputMixEnvirRevarb
-    LOGE("CreateOutputMix GetInterface %d", result);
     mOutputMixEnvirReverbSettings = SL_I3DL2_ENVIRONMENT_PRESET_DEFAULT;
     // 设置
     if (result == SL_RESULT_SUCCESS) {
@@ -79,7 +77,7 @@ void Opensles::createPlayer(size_t samplerate, size_t channelCount) {
     getDataQueueCallBack(mBufferQueueInterface, NULL);
 }
 
-void getDataQueueCallBack(SLAndroidSimpleBufferQueueItf bufferQueueInterface, void* context) {
+void Opensles::getDataQueueCallBack(SLAndroidSimpleBufferQueueItf bufferQueueInterface, void* context) {
     size_t buffersize = 0;
     void *buffer;
     getPcmDataInterface(&buffer, &buffersize);
